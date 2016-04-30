@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>GitHub Explorer</title>
+	<script src="https://d3js.org/d3.v3.min.js"></script>
+	<script>
+		var API_KEY = "c78f97af8a5760ba0cee9345abacf8fb918526c5";
+
+		function api(method, path) {
+			return new Promise(function (resolve, reject) {
+				var xhr = new XMLHttpRequest();
+				xhr.open(method, "https://api.github.com" + path);
+				xhr.setRequestHeader("Accept", "application/vnd.github.v3+json");
+				xhr.onload = function () {
+					resolve(JSON.parse(this.responseText));
+				};
+				xhr.send();
+			});
+		}
+	</script>
+</head>
+<body>
+	<script>
+		api("GET", "/users/simonsdeng/following").then(function (value) {
+			console.log(value);
+		});
+	</script>
+</body>
+</html>
