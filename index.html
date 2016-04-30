@@ -5,12 +5,11 @@
 	<title>GitHub Explorer</title>
 	<script src="https://d3js.org/d3.v3.min.js"></script>
 	<script>
-		var API_KEY = "c78f97af8a5760ba0cee9345abacf8fb918526c5";
-
 		function api(method, path) {
 			return new Promise(function (resolve, reject) {
 				var xhr = new XMLHttpRequest();
 				xhr.open(method, "https://api.github.com" + path);
+				xhr.setRequestHeader("Authorization", "token 5f6ef191be0caf75f3a16f2ab4d223a596665158");
 				xhr.setRequestHeader("Accept", "application/vnd.github.v3+json");
 				xhr.onload = function () {
 					resolve(JSON.parse(this.responseText));
@@ -18,12 +17,111 @@
 				xhr.send();
 			});
 		}
+
+		var visitedUsers = new Set();
+		var visitedRepos = new Set();
+
+		function Repo(fullname) {
+			this.fullname = fullname;
+			this.contributors = [];
+		}
+
+		function makeRepo(repoName) {
+			return new Promise(function(resolve, reject) {
+				var repo = new Repo(repoName);
+				Promise.all([repo.loadContributors()]).then(function() {
+					resolve(repo);
+					visitedRepos.add(repo.fullname);
+				})
+			})
+		}
+
+		Repo.prototype.loadContributors = function() {
+			var contributors = this.contributors;
+			return api('GET', '/repos/' + this.fullname + '/contributors').then(function(response) {
+				for (var i = 0; i < response.length; i++) {
+					if (!visitedUsers.has(response[i].login)) {
+						contributors.push(response[i].login);
+					}
+				}
+			});
+		}
+
+		function User(username) {
+		    this.username = username;
+		    this.following = [];
+		    this.repos = [];
+		    this.starred = [];
+		}
+
+		function makeUser(username) {
+			return new Promise(function(resolve, reject) {
+				var user = new User(username);
+				Promise.all([user.loadFollowing(), user.loadRepos(), user.loadStarred()]).then(function() {
+					resolve(user);
+					visitedUsers.add(username);
+				});
+			})
+		}
+
+		User.prototype.loadFollowing = function() {
+			var following = this.following;
+			return api('GET', '/users/' + this.username + '/following').then(function (response) {
+				for (var i = 0; i < response.length; i++) {
+					if (!visitedUsers.has(response[i].login)) {
+						following.push(response[i].login);
+					}
+				}
+			});
+		}
+
+		User.prototype.loadRepos = function() {
+			var repos = this.repos;
+			return api('GET', '/users/' + this.username + '/repos').then(function (response) {
+				for (var i = 0; i < response.length; i++) {
+					if (!visitedRepos.has(response[i].full_name)) {
+						repos.push(response[i].full_name);
+					}
+				}
+			});
+		}
+
+		User.prototype.loadStarred = function() {
+			var starred = this.starred;
+			return api('GET', '/users/' + this.username + '/starred').then(function (response) {
+				for (var i = 0; i < response.length; i++) {
+					if (!visitedRepos.has(response[i].full_name)) {
+						starred.push(response[i].full_name);
+					}
+				}
+			});
+		}
 	</script>
 </head>
 <body>
 	<script>
-		api("GET", "/users/simonsdeng/following").then(function (value) {
-			console.log(value);
+		api("GET", "/users/simonsdeng").then(function (value) {
+			makeUser(value.login).then(function (user) {
+				console.log(user);
+				var userRepos = [];
+				for (var i = 0; i < user.repos.length; i++) {
+					userRepos.push(makeRepo(user.repos[i]));
+				}
+				Promise.all(userRepos).then(function(values) {
+					for (var i = 0; i < values.length; i++) {
+						console.log(values[i]);
+						var repoContributors = [];
+						for (var j = 0; j < values[i].contributors.length; j++) {
+							repoContributors.push(makeUser(values[i].contributors[j]));
+						}
+						Promise.all(repoContributors).then(function(values2) {
+							for (var i = 0; i < values2.length; i++) {
+								console.log(values2[i]);
+							}
+						});
+					}
+				});
+			});
 		});
 	</script>
 </body>
